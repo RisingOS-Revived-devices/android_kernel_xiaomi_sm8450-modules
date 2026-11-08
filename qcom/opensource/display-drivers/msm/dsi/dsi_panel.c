@@ -574,6 +574,7 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 	int rc = 0;
 	unsigned long mode_flags = 0;
 	struct mipi_dsi_device *dsi = NULL;
+	u32 dbv;
 
 	if (!panel || (bl_lvl > 0xffff)) {
 		DSI_ERR("invalid params\n");
@@ -589,12 +590,15 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 	if (dsi_panel_mi_set_backlight(panel, &bl_lvl))
 		goto exit;
 
+	dbv = bl_lvl;
 	if (panel->bl_config.bl_inverted_dbv)
 		bl_lvl = (((bl_lvl & 0xff) << 8) | (bl_lvl >> 8));
 
 	rc = mipi_dsi_dcs_set_display_brightness(dsi, bl_lvl);
 	if (rc < 0)
 		DSI_ERR("failed to update dcs backlight:%d\n", bl_lvl);
+	else
+		mi_dsi_panel_notify_dbv(panel, dbv);
 
 exit:
 	if (unlikely(panel->bl_config.lp_mode))
@@ -2135,7 +2139,7 @@ int dsi_panel_alloc_cmd_packets(struct dsi_panel_cmd_set *cmd,
 	return 0;
 }
 
-static int dsi_panel_parse_cmd_sets_sub(struct dsi_panel_cmd_set *cmd,
+int dsi_panel_parse_cmd_sets_sub(struct dsi_panel_cmd_set *cmd,
 					enum dsi_cmd_set_type type,
 					struct dsi_parser_utils *utils)
 {
@@ -3918,6 +3922,7 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 	drm_panel_add(&panel->drm_panel);
 
 	mutex_init(&panel->panel_lock);
+	mi_dsi_panel_init(panel);
 
 	return panel;
 error:
@@ -3927,6 +3932,7 @@ error:
 
 void dsi_panel_put(struct dsi_panel *panel)
 {
+	mi_dsi_panel_deinit(panel);
 	drm_panel_remove(&panel->drm_panel);
 
 	/* free resources allocated for ESD check */
@@ -5013,6 +5019,7 @@ int dsi_panel_enable(struct dsi_panel *panel)
 		}
 	}
 	panel->panel_initialized = true;
+	mi_dsi_panel_enable(panel);
 
 error:
 	mutex_unlock(&panel->panel_lock);
@@ -5107,6 +5114,7 @@ int dsi_panel_disable(struct dsi_panel *panel)
 	}
 	panel->panel_initialized = false;
 	panel->power_mode = SDE_MODE_DPMS_OFF;
+	mi_dsi_panel_disable(panel);
 
 	mutex_unlock(&panel->panel_lock);
 	return rc;

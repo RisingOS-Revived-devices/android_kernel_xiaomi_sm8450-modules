@@ -15,8 +15,6 @@
 #include "mi_disp_feature.h"
 #include "mi_dsi_display.h"
 
-#define to_sde_encoder_virt(x) container_of(x, struct sde_encoder_virt, base)
-
 static struct calc_hw_vsync g_calc_hw_vsync[MI_DISP_MAX];
 
 void mi_sde_encoder_save_vsync_info(struct sde_encoder_phys *phys_enc)
@@ -43,6 +41,8 @@ void mi_sde_encoder_save_vsync_info(struct sde_encoder_phys *phys_enc)
 		return;
 
 	info = &sde_enc->mode_info;
+	if (!info->frame_rate)
+		return;
 	config_vsync_period_us = USEC_PER_SEC / info->frame_rate;
 
 	current_ktime = ktime_get();
@@ -106,6 +106,13 @@ ssize_t mi_sde_encoder_calc_hw_vsync_info(struct dsi_display *display,
 		index = (index == 0) ? (MAX_VSYNC_COUNT - 1) : (index - 1);
 	}
 
+	/* Nothing was recorded yet */
+	if (!count)
+		return scnprintf(buf, size, "fps: 0.0 vsync_period_ns:0"
+				" panel_mode:%s panel_type:%s\n",
+				(display->panel->panel_mode == DSI_OP_VIDEO_MODE) ?
+				"dsi_video" : "dsi_cmd", display->panel->type);
+
 	if (valid_count && valid_count > fps / 4) {
 		calc_vsync->measured_vsync_period_ns =
 				valid_total_vsync_period_ns / valid_count;
@@ -115,21 +122,21 @@ ssize_t mi_sde_encoder_calc_hw_vsync_info(struct dsi_display *display,
 	}
 
 	/* Multiplying with 1000 to get fps in floating point */
-	calc_vsync->measured_fps_x1000 =
-			(u32)((NSEC_PER_SEC * 1000) / calc_vsync->measured_vsync_period_ns);
-	DISP_INFO("[hw_vsync_info]fps: %d.%d, vsync_period_ns:%lld,"
-			" panel_mode:%s, panel_type:%s, average of %d statistics\n",
-			calc_vsync->measured_fps_x1000 / 1000,
-			calc_vsync->measured_fps_x1000 % 1000,
+	calc_vsync->measured_fps_x1000 = calc_vsync->measured_vsync_period_ns ?
+			(u32)((NSEC_PER_SEC * 1000) / calc_vsync->measured_vsync_period_ns) : 0;
+	DISP_INFO("[hw_vsync_info]fps: %u.%u, vsync_period_ns:%llu,"
+			" panel_mode:%s, panel_type:%s, average of %u statistics\n",
+			(u32)(calc_vsync->measured_fps_x1000 / 1000),
+			(u32)(calc_vsync->measured_fps_x1000 % 1000),
 			calc_vsync->measured_vsync_period_ns,
 			(display->panel->panel_mode == DSI_OP_VIDEO_MODE) ? "dsi_video" : "dsi_cmd",
 			display->panel->type,
 			valid_count ? valid_count : count);
 
-	return scnprintf(buf, size, "fps: %d.%d vsync_period_ns:%lld"
+	return scnprintf(buf, size, "fps: %u.%u vsync_period_ns:%llu"
 			" panel_mode:%s panel_type:%s\n",
-			calc_vsync->measured_fps_x1000 / 1000,
-			calc_vsync->measured_fps_x1000 % 1000,
+			(u32)(calc_vsync->measured_fps_x1000 / 1000),
+			(u32)(calc_vsync->measured_fps_x1000 % 1000),
 			calc_vsync->measured_vsync_period_ns,
 			(display->panel->panel_mode == DSI_OP_VIDEO_MODE) ? "dsi_video" : "dsi_cmd",
 			display->panel->type);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 #include <linux/slab.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
@@ -8,6 +9,7 @@
 #include "mi_dsi_panel.h"
 #include "mi_dsi_display.h"
 #include "mi_disp_flatmode.h"
+#include "mi_disp_parser.h"
 
 static void mi_dsi_panel_flatmode_freemem(struct mi_panel_flatmode_config *config)
 {
@@ -26,7 +28,8 @@ static void mi_dsi_panel_flatmode_freemem(struct mi_panel_flatmode_config *confi
 static bool mi_flatmode_validate_status(struct dsi_display *display,
 		struct mi_panel_flatmode_config *config)
 {
-	int i, count = 0, start = 0, len = 0, *lenp;
+	int i, count = 0, start = 0, len = 0;
+	u32 *lenp;
 	struct dsi_cmd_desc *cmds;
 	u16 flags = 0;
 
@@ -75,13 +78,13 @@ int mi_dsi_panel_flatmode_validate_status(struct dsi_display *display, bool *sta
 	struct mi_dsi_panel_cfg *mi_cfg;
 	struct dsi_panel *panel;
 
-	panel = display->panel;
-	mi_cfg = &panel->mi_cfg;
-
-	if (!display || !panel || !mi_cfg || !status) {
+	if (!display || !display->panel || !status) {
 		DISP_ERROR("Invalid ptr\n");
 		return -EINVAL;
 	}
+
+	panel = display->panel;
+	mi_cfg = &panel->mi_cfg;
 
 	flatmode_check_enabled = mi_cfg->flatmode_check_enabled;
 	if (!flatmode_check_enabled) {

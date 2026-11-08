@@ -20,6 +20,7 @@
 #include "sde_crtc.h"
 #include "sde_rm.h"
 #include "sde_vm.h"
+#include "mi_sde_connector.h"
 #include <drm/drm_probe_helper.h>
 #include <linux/version.h>
 
@@ -180,6 +181,7 @@ static int sde_backlight_device_update_status(struct backlight_device *bd)
 			msm_mode_object_event_notify(&c_conn->base.base,
 				c_conn->base.dev, &event, (u8 *)&brightness);
 		}
+		mi_sde_connector_backlight_notify(&c_conn->base, brightness);
 		rc = c_conn->ops.set_backlight(&c_conn->base,
 				c_conn->display, bl_lvl);
 		if (!rc)
@@ -1122,6 +1124,8 @@ int sde_connector_pre_kickoff(struct drm_connector *connector, bool force_update
 	params.hdr_meta = &c_state->hdr_meta;
 
 	SDE_EVT32_VERBOSE(connector->base.id);
+
+	mi_sde_connector_flat_fence(connector);
 
 	rc = c_conn->ops.pre_kickoff(connector, c_conn->display, &params, force_update_dsi_clocks);
 

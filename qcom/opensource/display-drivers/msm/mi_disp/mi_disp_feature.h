@@ -52,8 +52,6 @@ struct disp_display {
 	struct kthread_worker *worker;
 	wait_queue_head_t pending_wq;
 	atomic_t pending_doze_cnt;
-
-	struct disp_lhbm_fod *lhbm_fod_ptr;
 };
 
 struct disp_feature {

@@ -19,6 +19,7 @@
 #include "dsi_defs.h"
 #include "dsi_ctrl_hw.h"
 #include "dsi_panel_mi.h"
+#include "mi_dsi_panel.h"
 #include "dsi_clk.h"
 #include "dsi_pwr.h"
 #include "dsi_parser.h"
@@ -260,6 +261,7 @@ struct dsi_panel {
 	bool reset_gpio_always_on;
 
 	struct dsi_panel_mi mi;
+	struct mi_dsi_panel_cfg mi_cfg;
 	atomic_t esd_recovery_pending;
 
 	bool panel_initialized;
@@ -414,6 +416,9 @@ void dsi_panel_calc_dsi_transfer_time(struct dsi_host_common_cfg *config,
 		struct dsi_display_mode *mode, u32 frame_threshold_us);
 
 int dsi_panel_get_cmd_pkt_count(const char *data, u32 length, u32 *cnt);
+
+int dsi_panel_parse_cmd_sets_sub(struct dsi_panel_cmd_set *cmd,
+		enum dsi_cmd_set_type type, struct dsi_parser_utils *utils);
 
 int dsi_panel_alloc_cmd_packets(struct dsi_panel_cmd_set *cmd,
 		u32 packet_count);

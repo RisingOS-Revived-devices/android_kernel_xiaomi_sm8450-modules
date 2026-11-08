@@ -24,6 +24,7 @@
 #include "dsi_pwr.h"
 #include "sde_dbg.h"
 #include "dsi_parser.h"
+#include "mi_dsi_display.h"
 
 #define to_dsi_display(x) container_of(x, struct dsi_display, host)
 #define INT_BASE_10 10
@@ -54,6 +55,46 @@ static const struct of_device_id dsi_display_dt_match[] = {
 	{.compatible = "qcom,dsi-display"},
 	{}
 };
+
+/* Panel name of the boot display selection, for mi_disp panel_info */
+char *mi_dsi_display_get_cmdline_panel_info(struct dsi_display *display)
+{
+	char *buffer = NULL, *buffer_dup = NULL;
+	char *pname = NULL;
+	char *panel_info = NULL;
+	int index = DSI_PRIMARY;
+
+	if (!display)
+		return NULL;
+
+	if (!strcmp(display->display_type, "primary"))
+		index = DSI_PRIMARY;
+	else if (!strcmp(display->display_type, "secondary"))
+		index = DSI_SECONDARY;
+	else
+		return NULL;
+
+	buffer = kstrdup(boot_displays[index].boot_param, GFP_KERNEL);
+	if (!buffer)
+		return NULL;
+	buffer_dup = buffer;
+
+	buffer = strrchr(buffer, ',');
+	if (buffer && *buffer)
+		pname = ++buffer;
+	else
+		goto exit;
+
+	buffer = strrchr(pname, ':');
+	if (buffer)
+		*buffer = '\0';
+
+	panel_info = kstrdup(pname, GFP_KERNEL);
+
+exit:
+	kfree(buffer_dup);
+	return panel_info;
+}
 
 bool is_skip_op_required(struct dsi_display *display)
 {
@@ -1042,7 +1083,7 @@ release_panel_lock:
 	return rc;
 }
 
-static int dsi_display_ctrl_get_host_init_state(struct dsi_display *dsi_display,
+int dsi_display_ctrl_get_host_init_state(struct dsi_display *dsi_display,
 		bool *state)
 {
 	struct dsi_display_ctrl *ctrl;
@@ -1061,7 +1102,7 @@ static int dsi_display_ctrl_get_host_init_state(struct dsi_display *dsi_display,
 	return rc;
 }
 
-static int dsi_display_cmd_rx(struct dsi_display *display,
+int dsi_display_cmd_rx(struct dsi_display *display,
 			      struct dsi_cmd_desc *cmd)
 {
 	struct dsi_display_ctrl *m_ctrl = NULL;
@@ -5827,6 +5868,7 @@ static int dsi_display_bind(struct device *dev,
 
 
 	msm_register_vm_event(master, dev, &vm_event_ops, (void *)display);
+	mi_dsi_display_bind(display);
 
 	goto error;
 
@@ -5874,6 +5916,8 @@ static void dsi_display_unbind(struct device *dev,
 		DSI_ERR("invalid display\n");
 		return;
 	}
+
+	mi_dsi_display_unbind(display);
 
 	mutex_lock(&display->display_lock);
 
@@ -9148,12 +9192,14 @@ void __init dsi_display_register(void)
 
 	dsi_display_parse_boot_display_selection();
 
+	mi_disp_feature_init();
 	platform_driver_register(&dsi_display_driver);
 }
 
 void __exit dsi_display_unregister(void)
 {
 	platform_driver_unregister(&dsi_display_driver);
+	mi_disp_feature_deinit();
 	dsi_ctrl_drv_unregister();
 	dsi_phy_drv_unregister();
 }

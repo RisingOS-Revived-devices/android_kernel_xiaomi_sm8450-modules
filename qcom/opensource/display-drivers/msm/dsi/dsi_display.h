@@ -710,6 +710,15 @@ int dsi_display_cmd_transfer(struct drm_connector *connector,
 int dsi_display_cmd_receive(void *display, const char *cmd_buf,
 			    u32 cmd_buf_len, u8 *recv_buf, u32 recv_buf_len, ktime_t *ts);
 
+char *mi_dsi_display_get_cmdline_panel_info(struct dsi_display *display);
+
+/* Used by mi_disp to read panel registers */
+int dsi_display_ctrl_get_host_init_state(struct dsi_display *dsi_display,
+		bool *state);
+
+int dsi_display_cmd_rx(struct dsi_display *display,
+		struct dsi_cmd_desc *cmd);
+
 /**
  * dsi_display_soft_reset() - perform a soft reset on DSI controller
  * @display:         Handle to display

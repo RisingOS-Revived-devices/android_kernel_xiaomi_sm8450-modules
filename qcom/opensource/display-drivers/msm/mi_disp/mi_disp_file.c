@@ -139,7 +139,7 @@ ssize_t mi_disp_read(struct file *filp, char __user *buffer,
 			unsigned copy_length = length - e->offset;
 			bool partial_read = false;
 
-			DISP_DEBUG("length is: %d, offset is: %d, count is %d",
+			DISP_DEBUG("length is: %d, offset is: %d, count is %zu",
 					length, e->offset, count);
 
 			if (copy_length > count - ret) {
@@ -275,7 +275,15 @@ static int mi_disp_ioctl_set_feature(struct disp_feature_client *client, void *d
 				}
 
 				if (req->base.flag == MI_DISP_FLAG_NONBLOCK) {
-					ret = mi_disp_set_feature_queue_work(dd_ptr, &ctl, sizeof(ctl));
+					/* The buffers are freed below, before the work runs */
+					struct disp_feature_ctl queued_ctl = ctl;
+
+					queued_ctl.tx_len = 0;
+					queued_ctl.tx_ptr = NULL;
+					queued_ctl.rx_len = 0;
+					queued_ctl.rx_ptr = NULL;
+					ret = mi_disp_set_feature_queue_work(dd_ptr,
+							&queued_ctl, sizeof(queued_ctl));
 				} else {
 					ret = mi_dsi_display_set_disp_param(dd_ptr->display, &ctl);
 				}

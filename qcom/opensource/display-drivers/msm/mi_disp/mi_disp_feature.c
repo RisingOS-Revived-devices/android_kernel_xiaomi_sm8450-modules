@@ -29,7 +29,6 @@
 #include "mi_disp_feature.h"
 #include "mi_disp_file.h"
 #include "mi_disp_sysfs.h"
-#include "mi_disp_lhbm.h"
 
 #include "mi_disp_procfs.h"
 #include "mi_disp_debugfs.h"
@@ -65,8 +64,9 @@ static int mi_disp_feature_thread_create(struct disp_feature *df, int disp_id)
 	dd_ptr->worker = kthread_create_worker(0, "disp_feature:%d", disp_id);
 	if (IS_ERR(dd_ptr->worker)) {
 		DISP_ERROR("failed to create disp_feature:%d kthread\n", disp_id);
-		return PTR_ERR(dd_ptr->worker);
-
+		ret = PTR_ERR(dd_ptr->worker);
+		dd_ptr->worker = NULL;
+		return ret;
 	}
 	/* set realtime priority */
 	sched_set_fifo(dd_ptr->worker->task);
@@ -93,6 +93,7 @@ static int mi_disp_feature_thread_destroy(struct disp_feature *df, int disp_id)
 	dd_ptr = &df->d_display[disp_id];
 	if (dd_ptr->worker) {
 		kthread_destroy_worker(dd_ptr->worker);
+		dd_ptr->worker = NULL;
 	}
 
 	DISP_INFO("destroy disp_feature:%d kthread success\n", disp_id);
@@ -149,16 +150,11 @@ int mi_disp_feature_attach_display(void *display, int disp_id, int intf_type)
 		goto err_sysfs;
 	}
 
-	ret = mi_disp_lhbm_fod_thread_create(df, disp_id);
-	if (ret) {
-		DISP_ERROR("failed to create fod_thread kthread\n");
-		goto err_feature_thread;
-	}
-
+	/* Local HBM is driven by the dsi_display_mi worker of the display */
 	ret = mi_disp_procfs_init(dd_ptr, disp_id);
 	if (ret) {
 		DISP_ERROR("failed to create procfs entry\n");
-		goto err_fod_thread;
+		goto err_feature_thread;
 	}
 
 	ret = mi_disp_debugfs_init(dd_ptr, disp_id);
@@ -174,8 +170,6 @@ int mi_disp_feature_attach_display(void *display, int disp_id, int intf_type)
 
 err_procfs:
 	mi_disp_procfs_deinit(dd_ptr, disp_id);
-err_fod_thread:
-	mi_disp_lhbm_fod_thread_destroy(df, disp_id);
 err_feature_thread:
 	mi_disp_feature_thread_destroy(df, disp_id);
 err_sysfs:
@@ -184,6 +178,8 @@ err_dev:
 	device_unregister(dd_ptr->dev);
 	dd_ptr->dev = NULL;
 err_exit:
+	dd_ptr->display = NULL;
+	dd_ptr->intf_type = MI_INTF_MAX;
 	return ret;
 }
 
@@ -222,10 +218,6 @@ int mi_disp_feature_detach_display(void *display, int disp_id, int intf_type)
 	ret = mi_disp_procfs_deinit(dd_ptr, disp_id);
 	if (ret < 0)
 		DISP_ERROR("failed to remove procfs entry\n");
-
-	ret = mi_disp_lhbm_fod_thread_destroy(df, disp_id);
-	if (ret)
-		DISP_ERROR("failed to destroy disp_fod kthread\n");
 
 	ret = mi_disp_feature_thread_destroy(df, disp_id);
 	if (ret)
@@ -308,7 +300,7 @@ int mi_disp_feature_event_notify_by_type(int disp_id, u32 type, u32 len, u64 val
 	if (!is_support_disp_id(disp_id) ||
 		!is_support_disp_event_type(type)) {
 		DISP_ERROR("invalid display id(%d) or event type(%d)!\n",
-			event.disp_id, event.type);
+			disp_id, type);
 		return -EINVAL;
 	}
 
@@ -328,6 +320,8 @@ void mi_disp_feature_sysfs_notify(int disp_id, int sysfs_node)
 		return;
 
 	if (is_support_disp_id(disp_id) && is_support_disp_sysfs_node(sysfs_node)) {
+		if (!df->d_display[disp_id].dev)
+			return;
 		sysfs_notify(&df->d_display[disp_id].dev->kobj, NULL,
 				get_disp_sysfs_node_name(sysfs_node));
 	} else {

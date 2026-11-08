@@ -9,19 +9,24 @@
 
 #include "dsi_display.h"
 #include "dsi_display_mi.h"
+#include "mi_dsi_display.h"
 
 static void dsi_display_mi_set_fod_ui(struct dsi_display *display, bool fod_ui)
 {
 	struct dsi_display_mi *mi = &display->mi;
 	bool changed;
+	u32 target;
 
 	mutex_lock(&mi->lock);
 	changed = mi->fod_ui != fod_ui;
 	mi->fod_ui = fod_ui;
+	target = mi->lhbm_target;
 	mutex_unlock(&mi->lock);
 
-	if (changed)
+	if (changed) {
 		sysfs_notify(&display->pdev->dev.kobj, NULL, "fod_ui");
+		mi_dsi_display_notify_fod_ui(display, fod_ui, target);
+	}
 }
 
 static void dsi_display_mi_lhbm_work(struct kthread_work *work)
@@ -71,6 +76,10 @@ static void dsi_display_mi_lhbm_work(struct kthread_work *work)
 void dsi_display_mi_set_allowed(struct dsi_display *display, bool allowed)
 {
 	struct dsi_display_mi *mi = &display->mi;
+
+	/* mi_disp doze brightness requests wait for the panel to be on */
+	if (allowed)
+		mi_dsi_display_wakeup_pending_doze_work(display);
 
 	if (!mi->worker)
 		return;
@@ -122,6 +131,8 @@ void dsi_display_mi_notify(struct dsi_display *display,
 	if (changed)
 		sysfs_notify(&display->pdev->dev.kobj, NULL,
 				dsi_display_mi_state_names[state]);
+
+	mi_dsi_display_notify(display, state, value, changed);
 }
 
 static ssize_t dsi_display_mi_state_show(struct device *dev, char *buf,

@@ -11,6 +11,7 @@
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
 #include <linux/delay.h>
+#include <linux/seq_file.h>
 
 #include <drm/mi_disp.h>
 
@@ -28,7 +29,7 @@
 #define BACKLIGHT_LOG_DEBUGFS_NAME  "backlight_log"
 #define FOD_TEST_DEBUGFS_NAME       "fod_test"
 
-const char *esd_sw_str[MI_DISP_MAX] = {
+static const char *esd_sw_str[MI_DISP_MAX] = {
 	[MI_DISP_PRIMARY] = "esd_sw_prim",
 	[MI_DISP_SECONDARY] = "esd_sw_sec",
 };
@@ -197,6 +198,7 @@ static int mi_disp_debugfs_esd_sw_init(void *d_display, int disp_id)
 			dd_ptr, &esd_sw_debugfs_fops);
 
 		if (IS_ERR_OR_NULL(disp_debugfs.esd_sw[disp_id])) {
+			disp_debugfs.esd_sw[disp_id] = NULL;
 			DISP_ERROR("create debugfs entry failed for %s\n", esd_sw_str[disp_id]);
 			ret = -ENODEV;
 		} else {
@@ -385,7 +387,8 @@ static int mi_disp_debugfs_fod_test_init(void *d_display, int disp_id)
 		disp_debugfs.fod_test = debugfs_create_file(FOD_TEST_DEBUGFS_NAME,
 			S_IWUGO, disp_core->debugfs_dir,
 			dd_ptr, &fod_test_debugfs_fops);
-		if (!disp_debugfs.fod_test) {
+		if (IS_ERR_OR_NULL(disp_debugfs.fod_test)) {
+			disp_debugfs.fod_test = NULL;
 			DISP_ERROR("create debugfs entry failed for %s\n", FOD_TEST_DEBUGFS_NAME);
 			ret = -ENODEV;
 		} else {
@@ -432,14 +435,21 @@ static int mi_disp_debugfs_fod_test_deinit(void *d_display, int disp_id)
 
 int mi_disp_debugfs_init(void *d_display, int disp_id)
 {
+	struct disp_core *disp_core = mi_get_disp_core();
 	int ret = 0;
+
+	/* debugfs is optional, never fail attaching the display over it */
+	if (!disp_core || !disp_core->debugfs_dir)
+		return 0;
 
 	ret = mi_disp_debugfs_debug_log_init();
 	ret |= mi_disp_debugfs_backlight_log_init();
 	ret |= mi_disp_debugfs_esd_sw_init(d_display, disp_id);
 	ret |= mi_disp_debugfs_fod_test_init(d_display, disp_id);
+	if (ret)
+		DISP_INFO("some debugfs entries are missing, rc=%d\n", ret);
 
-	return ret;
+	return 0;
 }
 
 int mi_disp_debugfs_deinit(void *d_display, int disp_id)

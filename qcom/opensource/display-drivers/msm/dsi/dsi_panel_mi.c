@@ -340,6 +340,7 @@ static void dsi_panel_mi_set_hbm_active(struct dsi_panel *panel, bool active)
 		return;
 
 	panel->mi.hbm_active = active;
+	mi_dsi_panel_notify_hbm(panel, active);
 }
 
 /*
@@ -358,6 +359,9 @@ bool dsi_panel_mi_set_backlight(struct dsi_panel *panel, u32 *bl_lvl)
 
 	/* Applied when local HBM or FOD HBM is turned off */
 	if (mi->lhbm_nits || mi->fod_hbm)
+		return true;
+
+	if (mi_dsi_panel_skip_backlight(panel, *bl_lvl))
 		return true;
 
 	/* Doze brightness is part of the doze commands */
@@ -393,6 +397,7 @@ bool dsi_panel_mi_set_backlight(struct dsi_panel *panel, u32 *bl_lvl)
 		if (!dsi_panel_mi_tx_with_dbv(panel, hbm ? DSI_CMD_SET_MI_HBM_ON :
 				DSI_CMD_SET_MI_HBM_OFF, dbv)) {
 			dsi_panel_mi_set_hbm_active(panel, hbm);
+			mi_dsi_panel_notify_dbv(panel, dbv);
 			return true;
 		}
 

@@ -19,12 +19,12 @@
 
 #if MI_DISP_PROCFS_ENABLE
 
-const char *mipi_rw_str[MI_DISP_MAX] = {
+static const char *mipi_rw_str[MI_DISP_MAX] = {
 	[MI_DISP_PRIMARY] = "mipi_rw_prim",
 	[MI_DISP_SECONDARY] = "mipi_rw_sec",
 };
 
-const char *tx_cmd_set_str[MI_DISP_MAX] = {
+static const char *tx_cmd_set_str[MI_DISP_MAX] = {
 	[MI_DISP_PRIMARY] = "tx_cmd_set_prim",
 	[MI_DISP_SECONDARY] = "tx_cmd_set_sec",
 };
@@ -40,7 +40,7 @@ static ssize_t mi_disp_procfs_tx_cmd_set_write(struct file *filp,
 				const char __user *buf,
 				size_t count, loff_t *ppos)
 {
-	struct disp_display *dd_ptr = PDE_DATA(file_inode(filp));
+	struct disp_display *dd_ptr = pde_data(file_inode(filp));
 	char *input = NULL;
 	int type;
 	int ret = 0;
@@ -106,7 +106,7 @@ static int mi_disp_procfs_tx_cmd_set_show(struct seq_file *m, void *v)
 
 static int mi_disp_procfs_tx_cmd_set_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, mi_disp_procfs_tx_cmd_set_show, PDE_DATA(inode));
+	return single_open(file, mi_disp_procfs_tx_cmd_set_show, pde_data(inode));
 }
 
 static const struct proc_ops tx_cmd_set_proc_fops = {
@@ -121,7 +121,7 @@ static ssize_t mi_disp_procfs_mipi_rw_write(struct file *filp,
 				const char __user *buf,
 				size_t count, loff_t *ppos)
 {
-	struct disp_display *dd_ptr = PDE_DATA(file_inode(filp));
+	struct disp_display *dd_ptr = pde_data(file_inode(filp));
 	char *input = NULL;
 	int ret = 0;
 
@@ -178,7 +178,7 @@ static int mi_disp_procfs_mipi_rw_show(struct seq_file *m, void *v)
 
 static int mi_disp_procfs_mipi_rw_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, mi_disp_procfs_mipi_rw_show, PDE_DATA(inode));
+	return single_open(file, mi_disp_procfs_mipi_rw_show, pde_data(inode));
 }
 
 static const struct proc_ops mipi_rw_proc_fops = {

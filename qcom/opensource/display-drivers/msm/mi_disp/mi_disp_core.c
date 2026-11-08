@@ -99,7 +99,7 @@ struct disp_core * mi_get_disp_core(void)
 	return g_disp_core;
 }
 
-static char *mi_disp_devnode(struct device *dev, umode_t *mode)
+static char *mi_disp_devnode(const struct device *dev, umode_t *mode)
 {
 	return kasprintf(GFP_KERNEL, "%s/%s", MI_DISPLAY_CLASS, dev_name(dev));
 }
@@ -121,7 +121,7 @@ int mi_disp_core_init(void)
 		goto err_exit;
 	}
 
-	disp_core->class = class_create(THIS_MODULE, MI_DISPLAY_CLASS);
+	disp_core->class = class_create(MI_DISPLAY_CLASS);
 	if (IS_ERR(disp_core->class)) {
 		DISP_ERROR("class_create failed for %s\n", MI_DISPLAY_CLASS);
 		ret = PTR_ERR(disp_core->class);
@@ -136,11 +136,11 @@ int mi_disp_core_init(void)
 		goto err_class_destroy;
 	}
 
+	/* debugfs may be disabled on user builds, the rest works without it */
 	disp_core->debugfs_dir = debugfs_create_dir(MI_DISPLAY_DEBUGFS_DIR, NULL);
-	if (!disp_core->debugfs_dir) {
-		DISP_ERROR("debugfs_create_dir failed for %s\n", MI_DISPLAY_DEBUGFS_DIR);
-		ret = -ENOMEM;
-		goto err_procfs_remove;
+	if (IS_ERR_OR_NULL(disp_core->debugfs_dir)) {
+		DISP_INFO("debugfs_create_dir failed for %s\n", MI_DISPLAY_DEBUGFS_DIR);
+		disp_core->debugfs_dir = NULL;
 	}
 
 	g_disp_core = disp_core;
@@ -149,8 +149,6 @@ int mi_disp_core_init(void)
 
 	return 0;
 
-err_procfs_remove:
-	remove_proc_entry(MI_DISPLAY_PROCFS_DIR, NULL);
 err_class_destroy:
 	class_destroy(disp_core->class);
 err_free_mem:

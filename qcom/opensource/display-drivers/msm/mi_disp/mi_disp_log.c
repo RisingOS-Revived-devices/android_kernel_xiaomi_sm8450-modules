@@ -614,13 +614,13 @@ int mi_disp_log_init(void)
 		goto err_cdev_unreg;
 	}
 
-	disp_log->debug = debugfs_create_file(DISP_LOG_DEVICE_NAME,
-			0444, disp_core ? disp_core->debugfs_dir : NULL,
-			disp_log, &disp_log_debugfs_fops);
-	if (disp_log->debug == NULL) {
-		DISP_ERROR("debugfs_create_file failed for %s \n", DISP_LOG_DEVICE_NAME);
-		ret = -ENOMEM;
-		goto err_dev_destroy;
+	/* The log device works without debugfs, which user builds may lack */
+	if (disp_core && disp_core->debugfs_dir) {
+		disp_log->debug = debugfs_create_file(DISP_LOG_DEVICE_NAME,
+				0444, disp_core->debugfs_dir,
+				disp_log, &disp_log_debugfs_fops);
+		if (IS_ERR(disp_log->debug))
+			disp_log->debug = NULL;
 	}
 
 	disp_log->initialized = true;
@@ -630,8 +630,6 @@ int mi_disp_log_init(void)
 
 	return 0;
 
-err_dev_destroy:
-	device_destroy(disp_log->class, disp_log->dev_id);
 err_cdev_unreg:
 	mi_disp_cdev_unregister(disp_log->cdev);
 err_free_mem:
