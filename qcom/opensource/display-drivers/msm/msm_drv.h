@@ -199,6 +199,9 @@ enum msm_mdp_crtc_property {
 	CRTC_PROP_NOISE_LAYER_V1,
 	CRTC_PROP_FRAME_DATA_BUF,
 
+	/* mi add crtc property */
+	CRTC_PROP_MI_FOD_SYNC_INFO,
+
 	/* total # of properties */
 	CRTC_PROP_COUNT
 };

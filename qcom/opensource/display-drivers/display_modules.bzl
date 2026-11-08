@@ -170,6 +170,7 @@ module_entry(
             "msm/mi_disp/mi_disp_flatmode.c",
             "msm/mi_disp/mi_dsi_display.c",
             "msm/mi_disp/mi_dsi_panel.c",
+            "msm/mi_disp/mi_sde_crtc.c",
             "msm/mi_disp/mi_sde_encoder.c",
             "msm/mi_disp/mi_sde_connector.c",
          ],
