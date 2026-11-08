@@ -46,6 +46,8 @@ void dsi_display_mi_deinit(struct dsi_display *display);
 
 void dsi_display_mi_set_allowed(struct dsi_display *display, bool allowed);
 
+int dsi_display_mi_set_lhbm_target(struct dsi_display *display, u32 nits);
+
 void dsi_display_mi_notify(struct dsi_display *display,
 		enum dsi_display_mi_state state, u32 value);
 

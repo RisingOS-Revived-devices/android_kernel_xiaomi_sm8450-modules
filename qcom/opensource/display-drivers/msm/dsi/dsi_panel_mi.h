@@ -6,6 +6,7 @@
 #ifndef _DSI_PANEL_MI_H_
 #define _DSI_PANEL_MI_H_
 
+#include <linux/bits.h>
 #include <linux/ktime.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
@@ -76,6 +77,13 @@ enum dsi_panel_mi_doze {
  * @underflow_black: Show black instead of blue on video mode underflows.
  * @dfps_vfp:     <fps vfp> pairs overriding the dynamic fps front porches.
  * @dfps_vfp_count: Number of u32 in @dfps_vfp.
+ * @hbm_forced:   HBM was requested through mi_disp, the whole backlight range
+ *                is sent in HBM mode.
+ * @fod_hbm:      Global FOD HBM is on, backlight changes wait until it is off.
+ * @doze_request: Doze brightness requested through mi_disp, OFF to select it
+ *                by backlight level.
+ * @aod_to_normal: Panel left doze for the fingerprint animation while the
+ *                display stays in a low power mode.
  */
 struct dsi_panel_mi {
 	bool hbm_reg53;
@@ -137,7 +145,15 @@ struct dsi_panel_mi {
 	bool underflow_black;
 	u32 dfps_vfp[8];
 	int dfps_vfp_count;
+
+	bool hbm_forced;
+	bool fod_hbm;
+	enum dsi_panel_mi_doze doze_request;
+	bool aod_to_normal;
 };
+
+/* Local HBM level of the green 500 nit commands, other levels are in nits */
+#define DSI_PANEL_MI_LHBM_GREEN_500NIT (BIT(31) | 500)
 
 void dsi_panel_mi_parse(struct dsi_panel *panel);
 
@@ -160,6 +176,15 @@ bool dsi_panel_mi_has_doze(struct dsi_panel *panel);
 int dsi_panel_mi_set_doze(struct dsi_panel *panel, bool doze);
 
 int dsi_panel_mi_set_lhbm(struct dsi_panel *panel, u32 nits);
+
+int dsi_panel_mi_set_hbm(struct dsi_panel *panel, bool on);
+
+int dsi_panel_mi_set_fod_hbm(struct dsi_panel *panel, bool on);
+
+int dsi_panel_mi_set_doze_request(struct dsi_panel *panel,
+		enum dsi_panel_mi_doze doze);
+
+int dsi_panel_mi_aod_to_normal(struct dsi_panel *panel, bool enable);
 
 void dsi_panel_mi_esd_irq_ctrl(struct dsi_panel *panel, bool enable);
 

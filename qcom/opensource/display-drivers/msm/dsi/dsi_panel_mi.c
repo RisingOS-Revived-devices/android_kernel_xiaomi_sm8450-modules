@@ -160,7 +160,7 @@ static void dsi_panel_mi_dimming_work(struct work_struct *work)
 	mutex_lock(&panel->panel_lock);
 	/* The HBM, doze and local HBM commands handle dimming themselves */
 	if (panel->panel_initialized && !mi->doze && !mi->lhbm_nits &&
-	    !mi->hbm_active)
+	    !mi->hbm_active && !mi->fod_hbm)
 		dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_MI_DIMMINGON);
 	mutex_unlock(&panel->panel_lock);
 }
@@ -334,6 +334,14 @@ static int dsi_panel_mi_tx_with_dbv(struct dsi_panel *panel,
 	return dsi_panel_tx_cmd_set(panel, type);
 }
 
+static void dsi_panel_mi_set_hbm_active(struct dsi_panel *panel, bool active)
+{
+	if (panel->mi.hbm_active == active)
+		return;
+
+	panel->mi.hbm_active = active;
+}
+
 /*
  * Returns true if the backlight level was already sent along with an HBM mode
  * switch, otherwise bl_lvl is updated to the DBV for the current mode.
@@ -342,18 +350,19 @@ bool dsi_panel_mi_set_backlight(struct dsi_panel *panel, u32 *bl_lvl)
 {
 	struct dsi_panel_mi *mi = &panel->mi;
 	u32 normal_max = panel->bl_config.bl_max_level / 2;
-	bool hbm = *bl_lvl > normal_max;
-	u32 dbv = hbm ? *bl_lvl - normal_max - 1 : *bl_lvl;
+	/* mi_disp HBM sends the normal range in HBM mode as well */
+	bool hbm = *bl_lvl > normal_max || (mi->hbm_forced && *bl_lvl);
+	u32 dbv = *bl_lvl > normal_max ? *bl_lvl - normal_max - 1 : *bl_lvl;
 
 	mi->last_bl_lvl = *bl_lvl;
 
-	/* Applied when local HBM is turned off */
-	if (mi->lhbm_nits)
+	/* Applied when local HBM or FOD HBM is turned off */
+	if (mi->lhbm_nits || mi->fod_hbm)
 		return true;
 
 	/* Doze brightness is part of the doze commands */
 	if (mi->doze && dsi_panel_mi_has_doze(panel)) {
-		if (*bl_lvl)
+		if (*bl_lvl && !mi->aod_to_normal)
 			dsi_panel_mi_set_doze(panel, true);
 		return true;
 	}
@@ -383,7 +392,7 @@ bool dsi_panel_mi_set_backlight(struct dsi_panel *panel, u32 *bl_lvl)
 	if (hbm != mi->hbm_active) {
 		if (!dsi_panel_mi_tx_with_dbv(panel, hbm ? DSI_CMD_SET_MI_HBM_ON :
 				DSI_CMD_SET_MI_HBM_OFF, dbv)) {
-			mi->hbm_active = hbm;
+			dsi_panel_mi_set_hbm_active(panel, hbm);
 			return true;
 		}
 
@@ -410,7 +419,7 @@ void dsi_panel_mi_leave_hbm(struct dsi_panel *panel)
 			panel->bl_config.bl_max_level / 2))
 		DSI_ERR("[%s] failed to leave hbm\n", panel->name);
 
-	mi->hbm_active = false;
+	dsi_panel_mi_set_hbm_active(panel, false);
 }
 
 /* Called when the panel is turned on */
@@ -424,6 +433,9 @@ void dsi_panel_mi_reset_state(struct dsi_panel *panel)
 	panel->mi.gamma_updated = false;
 	panel->mi.gamma_pending = false;
 	panel->mi.bl_on = false;
+	panel->mi.hbm_forced = false;
+	panel->mi.fod_hbm = false;
+	panel->mi.aod_to_normal = false;
 	if (panel->cur_mode)
 		panel->mi.last_fps = panel->cur_mode->timing.refresh_rate;
 }
@@ -451,6 +463,9 @@ static int dsi_panel_mi_set_dbv_lp(struct dsi_panel *panel, u32 dbv)
 
 static enum dsi_panel_mi_doze dsi_panel_mi_doze_target(struct dsi_panel_mi *mi)
 {
+	if (mi->doze_request != DSI_PANEL_MI_DOZE_OFF)
+		return mi->doze_request;
+
 	return mi->last_bl_lvl > mi->doze_hbm_threshold ?
 			DSI_PANEL_MI_DOZE_HBM : DSI_PANEL_MI_DOZE_LBM;
 }
@@ -463,6 +478,8 @@ int dsi_panel_mi_set_doze(struct dsi_panel *panel, bool doze)
 	int rc;
 
 	mi->doze = doze;
+	if (!doze)
+		mi->aod_to_normal = false;
 
 	/* Applied when local HBM is turned off */
 	if (mi->lhbm_nits)
@@ -551,7 +568,25 @@ static u32 dsi_panel_mi_normal_dbv(struct dsi_panel *panel)
 	return min(mi->last_bl_lvl, panel->bl_config.bl_max_level / 2);
 }
 
-static int dsi_panel_mi_lhbm_on(struct dsi_panel *panel)
+static enum dsi_cmd_set_type dsi_panel_mi_lhbm_type(u32 nits, bool doze)
+{
+	switch (nits) {
+	case 110:
+		return doze ? DSI_CMD_SET_MI_LHBM_HLPM_WHITE_110NIT :
+				DSI_CMD_SET_MI_LHBM_NORMAL_WHITE_110NIT;
+	case 500:
+		return DSI_CMD_SET_MI_LHBM_NORMAL_WHITE_500NIT;
+	case 750:
+		return DSI_CMD_SET_MI_LHBM_NORMAL_WHITE_750NIT;
+	case DSI_PANEL_MI_LHBM_GREEN_500NIT:
+		return DSI_CMD_SET_MI_LHBM_NORMAL_GREEN_500NIT;
+	default:
+		return doze ? DSI_CMD_SET_MI_LHBM_HLPM_WHITE_1000NIT :
+				DSI_CMD_SET_MI_LHBM_NORMAL_WHITE_1000NIT;
+	}
+}
+
+static int dsi_panel_mi_lhbm_on(struct dsi_panel *panel, u32 nits)
 {
 	struct dsi_panel_mi *mi = &panel->mi;
 	enum dsi_cmd_set_type type;
@@ -559,13 +594,17 @@ static int dsi_panel_mi_lhbm_on(struct dsi_panel *panel)
 	int rc;
 
 	if (mi->doze_active != DSI_PANEL_MI_DOZE_OFF) {
-		type = DSI_CMD_SET_MI_LHBM_HLPM_WHITE_1000NIT;
+		type = dsi_panel_mi_lhbm_type(nits, true);
 		dbv = mi->doze_active == DSI_PANEL_MI_DOZE_HBM ?
 				mi->doze_hbm_dbv : mi->doze_lbm_dbv;
 	} else {
-		type = DSI_CMD_SET_MI_LHBM_NORMAL_WHITE_1000NIT;
+		type = dsi_panel_mi_lhbm_type(nits, false);
 		dbv = dsi_panel_mi_normal_dbv(panel);
 	}
+
+	/* Only the levels the panel has commands for can be shown */
+	if (!panel->cur_mode->priv_info->cmd_sets[type].count)
+		return -ENOENT;
 
 	dsi_panel_mi_update_param(panel, type, MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
 			dbv);
@@ -607,7 +646,7 @@ static int dsi_panel_mi_lhbm_off(struct dsi_panel *panel)
 	enum dsi_panel_mi_doze doze = DSI_PANEL_MI_DOZE_OFF;
 	int rc;
 
-	if (mi->doze)
+	if (mi->doze && !mi->aod_to_normal)
 		doze = dsi_panel_mi_doze_target(mi);
 
 	if (doze != DSI_PANEL_MI_DOZE_OFF) {
@@ -619,10 +658,12 @@ static int dsi_panel_mi_lhbm_off(struct dsi_panel *panel)
 		return rc;
 	}
 
-	if (mi->hbm_reg53 && mi->last_bl_lvl > normal_max) {
+	if (mi->hbm_reg53 && (mi->last_bl_lvl > normal_max ||
+			(mi->hbm_forced && mi->last_bl_lvl))) {
 		dsi_panel_mi_update_param(panel, DSI_CMD_SET_MI_LHBM_OFF_TO_HBM,
 				MIPI_DCS_SET_DISPLAY_BRIGHTNESS,
-				mi->last_bl_lvl - normal_max - 1);
+				mi->last_bl_lvl > normal_max ?
+				mi->last_bl_lvl - normal_max - 1 : mi->last_bl_lvl);
 		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_MI_LHBM_OFF_TO_HBM);
 		if (!rc)
 			mi->hbm_active = true;
@@ -662,7 +703,7 @@ int dsi_panel_mi_set_lhbm(struct dsi_panel *panel, u32 nits)
 	if (nits == mi->lhbm_nits)
 		return 0;
 
-	rc = nits ? dsi_panel_mi_lhbm_on(panel) :
+	rc = nits ? dsi_panel_mi_lhbm_on(panel, nits) :
 			dsi_panel_mi_lhbm_off(panel);
 	if (rc) {
 		DSI_ERR("[%s] failed to set local hbm %u, rc=%d\n",
@@ -671,6 +712,125 @@ int dsi_panel_mi_set_lhbm(struct dsi_panel *panel, u32 nits)
 	}
 
 	mi->lhbm_nits = nits;
+
+	return 0;
+}
+
+/*
+ * Called with panel_lock held. mi_disp HBM keeps the whole backlight range in
+ * HBM mode on panels selecting HBM through register 0x53, as on 5.10.
+ */
+int dsi_panel_mi_set_hbm(struct dsi_panel *panel, bool on)
+{
+	struct dsi_panel_mi *mi = &panel->mi;
+
+	if (!mi->hbm_reg53)
+		return 0;
+
+	mi->hbm_forced = on;
+	if (!panel->panel_initialized || panel->power_mode != SDE_MODE_DPMS_ON)
+		return 0;
+
+	return dsi_panel_set_backlight(panel, mi->last_bl_lvl);
+}
+
+/* Called with panel_lock held */
+int dsi_panel_mi_set_fod_hbm(struct dsi_panel *panel, bool on)
+{
+	struct dsi_panel_mi *mi = &panel->mi;
+	u8 buf[2];
+	u32 dbv;
+	int rc;
+
+	if (!panel->panel_initialized || !panel->cur_mode ||
+	    !panel->cur_mode->priv_info)
+		return -EAGAIN;
+
+	if (on) {
+		/* Without FOD HBM commands the backlight must not be held */
+		if (!panel->cur_mode->priv_info->cmd_sets[
+				DSI_CMD_SET_MI_HBM_FOD_ON].count)
+			return -ENOENT;
+
+		rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_MI_HBM_FOD_ON);
+		if (!rc)
+			mi->fod_hbm = true;
+		return rc;
+	}
+
+	if (!mi->fod_hbm)
+		return 0;
+
+	dbv = dsi_panel_mi_normal_dbv(panel);
+	buf[0] = dbv >> 8;
+	buf[1] = dbv & 0xff;
+	dsi_panel_mi_update_cmd_set(panel, DSI_CMD_SET_MI_HBM_FOD_OFF,
+			MIPI_DCS_SET_DISPLAY_BRIGHTNESS, buf, sizeof(buf));
+	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_MI_HBM_FOD_OFF);
+	mi->fod_hbm = false;
+	/* FOD HBM off leaves the normal mode, the backlight puts back HBM */
+	mi->hbm_active = false;
+	if (mi->last_bl_lvl)
+		dsi_panel_set_backlight(panel, mi->last_bl_lvl);
+
+	return rc;
+}
+
+/* Called with panel_lock held */
+int dsi_panel_mi_set_doze_request(struct dsi_panel *panel,
+		enum dsi_panel_mi_doze doze)
+{
+	struct dsi_panel_mi *mi = &panel->mi;
+
+	mi->doze_request = doze;
+	if (!panel->panel_initialized || !mi->doze || mi->aod_to_normal ||
+	    !dsi_panel_mi_has_doze(panel))
+		return 0;
+
+	return dsi_panel_mi_set_doze(panel, true);
+}
+
+/*
+ * Called with panel_lock held. Shows the normal mode while the display is in
+ * a low power mode, for the fingerprint animation.
+ */
+int dsi_panel_mi_aod_to_normal(struct dsi_panel *panel, bool enable)
+{
+	struct dsi_panel_mi *mi = &panel->mi;
+	enum dsi_cmd_set_type type;
+	int rc;
+
+	if (!panel->panel_initialized || !mi->doze ||
+	    !dsi_panel_mi_has_doze(panel))
+		return -EAGAIN;
+
+	/* Local HBM commands already show the normal mode */
+	if (mi->lhbm_nits)
+		return 0;
+
+	if (enable == mi->aod_to_normal)
+		return 0;
+
+	if (!enable) {
+		mi->aod_to_normal = false;
+		return dsi_panel_mi_set_doze(panel, true);
+	}
+
+	if (mi->doze_active == DSI_PANEL_MI_DOZE_OFF)
+		return 0;
+
+	type = DSI_CMD_SET_NOLP;
+	if (mi->doze_nolp)
+		type = mi->doze_active == DSI_PANEL_MI_DOZE_HBM ?
+				DSI_CMD_SET_MI_DOZE_HBM_NOLP :
+				DSI_CMD_SET_MI_DOZE_LBM_NOLP;
+
+	rc = dsi_panel_tx_cmd_set(panel, type);
+	if (rc)
+		return rc;
+
+	mi->doze_active = DSI_PANEL_MI_DOZE_OFF;
+	mi->aod_to_normal = true;
 
 	return 0;
 }

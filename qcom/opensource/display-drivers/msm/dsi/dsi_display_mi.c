@@ -85,6 +85,23 @@ void dsi_display_mi_set_allowed(struct dsi_display *display, bool allowed)
 		dsi_display_mi_set_fod_ui(display, false);
 }
 
+/* Local HBM level in nits or DSI_PANEL_MI_LHBM_GREEN_500NIT, 0 for off */
+int dsi_display_mi_set_lhbm_target(struct dsi_display *display, u32 nits)
+{
+	struct dsi_display_mi *mi = &display->mi;
+
+	if (!mi->worker)
+		return -ENODEV;
+
+	mutex_lock(&mi->lock);
+	mi->lhbm_target = nits;
+	mutex_unlock(&mi->lock);
+
+	kthread_queue_work(mi->worker, &mi->lhbm_work);
+
+	return 0;
+}
+
 static const char * const dsi_display_mi_state_names[] = {
 	[DSI_DISPLAY_MI_POWER] = "panel_power_state",
 	[DSI_DISPLAY_MI_FPS] = "dynamic_fps",
@@ -170,7 +187,6 @@ static ssize_t local_hbm_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct dsi_display *display = dev_get_drvdata(dev);
-	struct dsi_display_mi *mi = &display->mi;
 	u32 nits;
 	int rc;
 
@@ -181,13 +197,9 @@ static ssize_t local_hbm_store(struct device *dev,
 	if (nits && nits != 1000)
 		return -EINVAL;
 
-	mutex_lock(&mi->lock);
-	mi->lhbm_target = nits;
-	mutex_unlock(&mi->lock);
+	rc = dsi_display_mi_set_lhbm_target(display, nits);
 
-	kthread_queue_work(mi->worker, &mi->lhbm_work);
-
-	return count;
+	return rc ? rc : count;
 }
 
 static ssize_t fod_ui_show(struct device *dev,
