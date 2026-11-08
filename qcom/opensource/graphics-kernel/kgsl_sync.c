@@ -761,7 +761,6 @@ void kgsl_get_fence_info(struct kgsl_drawobj_sync_event *event)
 	unsigned int num_fences;
 	struct dma_fence *fence, **fences;
 	struct dma_fence_array *array;
-	struct event_fence_info *info_ptr = event->priv;
 	int i;
 
 	fence = event->handle->fence;
@@ -775,27 +774,6 @@ void kgsl_get_fence_info(struct kgsl_drawobj_sync_event *event)
 		fences = &fence;
 	}
 
-	if (!info_ptr)
-		goto count;
-
-	info_ptr->fences = kcalloc(num_fences, sizeof(struct fence_info),
-			GFP_KERNEL);
-	if (info_ptr->fences == NULL)
-		goto count;
-
-	info_ptr->num_fences = num_fences;
-
-	for (i = 0; i < num_fences; i++) {
-		struct dma_fence *f = fences[i];
-		struct fence_info *fi = &info_ptr->fences[i];
-
-		kgsl_get_fence_name(f, fi->name, sizeof(fi->name));
-
-		kgsl_count_hw_fences(event, f);
-	}
-
-	return;
-count:
 	for (i = 0; i < num_fences; i++)
 		kgsl_count_hw_fences(event, fences[i]);
 }
@@ -810,6 +788,11 @@ struct kgsl_sync_fence_cb *kgsl_sync_fence_async_wait(int fd,
 	fence = sync_file_get_fence(fd);
 	if (fence == NULL)
 		return ERR_PTR(-EINVAL);
+
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		dma_fence_put(fence);
+		return NULL;
+	}
 
 	/* create the callback */
 	kcb = kzalloc(sizeof(*kcb), GFP_KERNEL);
