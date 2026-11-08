@@ -1040,6 +1040,8 @@ int dsi_display_check_status(struct drm_connector *connector, void *display,
 
 	dsi_display_set_ctrl_esd_check_flag(dsi_display, true);
 
+	/* Keep the system awake until the panel status read is done */
+	mi_dsi_acquire_wakelock(dsi_display->panel);
 	dsi_display_clk_ctrl(dsi_display->dsi_clk_handle, DSI_ALL_CLKS, DSI_CLK_ON);
 
 	/* Disable error interrupts while doing an ESD check */
@@ -1076,6 +1078,7 @@ int dsi_display_check_status(struct drm_connector *connector, void *display,
 		dsi_display_toggle_error_interrupt_status(dsi_display, true);
 
 	dsi_display_clk_ctrl(dsi_display->dsi_clk_handle, DSI_ALL_CLKS, DSI_CLK_OFF);
+	mi_dsi_release_wakelock(dsi_display->panel);
 release_panel_lock:
 	dsi_panel_release_panel_lock(panel);
 	SDE_EVT32(SDE_EVTLOG_FUNC_EXIT, rc);
