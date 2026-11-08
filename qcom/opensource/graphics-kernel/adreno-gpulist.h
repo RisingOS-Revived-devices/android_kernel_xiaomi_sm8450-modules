@@ -18,6 +18,7 @@ static const struct adreno_gpu_core adreno_gpu_core_##_name = { \
 
 #define MHZ_TO_KBPS(mhz, w) ((u64)(mhz * 1000000ULL * w) / (1024))
 
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 DEFINE_DEPRECATED_CORE(a304, ADRENO_REV_A304, 4, 0, 5, ANY_ID);
 DEFINE_DEPRECATED_CORE(a306, ADRENO_REV_A306, 4, 0, 5, ANY_ID);
 DEFINE_DEPRECATED_CORE(a306a, ADRENO_REV_A306A, 4, 0, 5, ANY_ID);
@@ -1821,6 +1822,7 @@ static const struct adreno_a6xx_core adreno_gpu_core_gen6_3_26_0 = {
 	.protected_regs = a630_protected_regs,
 	.highest_bank_bit = 15,
 };
+#endif
 
 extern const struct gen7_snapshot_block_list gen7_0_0_snapshot_block_list;
 
@@ -1831,6 +1833,7 @@ static const struct kgsl_regmap_list gen7_0_0_gbif_cx_regs[] = {
 	{ GEN7_GBIF_QSB_SIDE3, 0x00071620 },
 };
 
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 static const struct kgsl_regmap_list a702_hwcg_regs[] = {
 	{A6XX_RBBM_CLOCK_CNTL_SP0, 0x22222222},
 	{A6XX_RBBM_CLOCK_CNTL2_SP0, 0x02222220},
@@ -1911,6 +1914,7 @@ static const struct adreno_a6xx_core adreno_gpu_core_a702 = {
 	.protected_regs = a620_protected_regs,
 	.highest_bank_bit = 14,
 };
+#endif
 
 static const struct kgsl_regmap_list gen7_0_0_hwcg_regs[] = {
 	{ GEN7_RBBM_CLOCK_CNTL_SP0, 0x02222222 },
@@ -2652,6 +2656,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_17_0 = {
 	.preempt_level = 1,
 };
 
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 static const struct kgsl_regmap_list a663_hwcg_regs[] = {
 	{A6XX_RBBM_CLOCK_CNTL_SP0, 0x02222222},
 	{A6XX_RBBM_CLOCK_CNTL2_SP0, 0x02222220},
@@ -3339,8 +3344,10 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_6_0 = {
 	.acv_perfmode_ddr_freq = MHZ_TO_KBPS(2736, 4),
 	.bcl_data = 1,
 };
+#endif
 
 static const struct adreno_gpu_core *adreno_gpulist[] = {
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 	&adreno_gpu_core_a306,		/* Deprecated */
 	&adreno_gpu_core_a306a,		/* Deprecated */
 	&adreno_gpu_core_a304,		/* Deprecated */
@@ -3381,9 +3388,12 @@ static const struct adreno_gpu_core *adreno_gpulist[] = {
 	&adreno_gpu_core_a660_shima.base,
 	&adreno_gpu_core_gen6_3_26_0.base,
 	&adreno_gpu_core_a702.base,
+#endif
 	&adreno_gpu_core_gen7_0_0.base,
 	&adreno_gpu_core_gen7_0_1.base,
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 	&adreno_gpu_core_a662.base,
+#endif
 	&adreno_gpu_core_gen7_2_0.base,
 	&adreno_gpu_core_gen7_2_1.base,
 	&adreno_gpu_core_gen7_3_0.base,
@@ -3394,9 +3404,11 @@ static const struct adreno_gpu_core *adreno_gpulist[] = {
 	&adreno_gpu_core_gen7_14_0.base,
 	&adreno_gpu_core_gen7_11_0.base,
 	&adreno_gpu_core_gen7_17_0.base,
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 	&adreno_gpu_core_gen8_0_0.base,
 	&adreno_gpu_core_gen8_0_1.base,
 	&adreno_gpu_core_gen8_3_0.base,
 	&adreno_gpu_core_gen8_4_0.base,
 	&adreno_gpu_core_gen8_6_0.base,
+#endif
 };

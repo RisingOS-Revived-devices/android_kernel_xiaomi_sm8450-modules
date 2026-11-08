@@ -452,10 +452,14 @@ struct gmu_core_device {
 	struct iommu_domain *domain;
 };
 
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 extern struct platform_driver a6xx_gmu_driver;
 extern struct platform_driver a6xx_rgmu_driver;
+#endif
 extern struct platform_driver gen7_gmu_driver;
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 extern struct platform_driver gen8_gmu_driver;
+#endif
 
 /* GMU core functions */
 

@@ -1086,11 +1086,13 @@ enum kgsl_ft_policy_bits {
 
 extern const struct adreno_power_ops adreno_power_operations;
 
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 extern const struct adreno_gpudev adreno_a5xx_gpudev;
 extern const struct adreno_gpudev adreno_a6xx_gpudev;
 extern const struct adreno_gpudev adreno_a6xx_rgmu_gpudev;
 extern const struct adreno_gpudev adreno_a619_holi_gpudev;
 extern const struct adreno_gpudev adreno_a611_gpudev;
+#endif
 
 extern int adreno_wake_nice;
 extern unsigned int adreno_wake_timeout;
@@ -1167,6 +1169,67 @@ static inline int adreno_is_##_name(struct adreno_device *adreno_dev) \
 	return (ADRENO_GPUREV(adreno_dev) == (_id)); \
 }
 
+#ifdef CONFIG_QCOM_KGSL_GEN7_ONLY
+/*
+ * Only Gen 7 cores are in adreno_gpulist on this target, so every other
+ * family check is a compile-time constant and its code paths fold away.
+ */
+#define ADRENO_TARGET_NEVER(_name) \
+static inline int adreno_is_##_name(struct adreno_device *adreno_dev) \
+{ \
+	return 0; \
+}
+
+ADRENO_TARGET_NEVER(a5xx)
+ADRENO_TARGET_NEVER(a505)
+ADRENO_TARGET_NEVER(a506)
+ADRENO_TARGET_NEVER(a508)
+ADRENO_TARGET_NEVER(a510)
+ADRENO_TARGET_NEVER(a512)
+ADRENO_TARGET_NEVER(a530)
+ADRENO_TARGET_NEVER(a540)
+ADRENO_TARGET_NEVER(a530v2)
+ADRENO_TARGET_NEVER(a530v3)
+ADRENO_TARGET_NEVER(a505_or_a506)
+ADRENO_TARGET_NEVER(a6xx)
+ADRENO_TARGET_NEVER(a660_shima)
+ADRENO_TARGET_NEVER(a610)
+ADRENO_TARGET_NEVER(a611)
+ADRENO_TARGET_NEVER(a612)
+ADRENO_TARGET_NEVER(a618)
+ADRENO_TARGET_NEVER(a619)
+ADRENO_TARGET_NEVER(a621)
+ADRENO_TARGET_NEVER(a630)
+ADRENO_TARGET_NEVER(a635)
+ADRENO_TARGET_NEVER(a662)
+ADRENO_TARGET_NEVER(a640)
+ADRENO_TARGET_NEVER(a650)
+ADRENO_TARGET_NEVER(a663)
+ADRENO_TARGET_NEVER(a680)
+ADRENO_TARGET_NEVER(gen6_3_26_0)
+ADRENO_TARGET_NEVER(a702)
+ADRENO_TARGET_NEVER(a660)
+ADRENO_TARGET_NEVER(a615_family)
+ADRENO_TARGET_NEVER(a640_family)
+ADRENO_TARGET_NEVER(a650_family)
+ADRENO_TARGET_NEVER(a619_holi)
+ADRENO_TARGET_NEVER(a620)
+ADRENO_TARGET_NEVER(a610_family)
+ADRENO_TARGET_NEVER(a612_family)
+ADRENO_TARGET_NEVER(a640v2)
+ADRENO_TARGET_NEVER(gen8)
+ADRENO_TARGET_NEVER(gen8_0_0)
+ADRENO_TARGET_NEVER(gen8_0_1)
+ADRENO_TARGET_NEVER(gen8_3_0)
+ADRENO_TARGET_NEVER(gen8_4_0)
+ADRENO_TARGET_NEVER(gen8_6_0)
+ADRENO_TARGET_NEVER(gen8_0_x_family)
+
+static inline int adreno_is_gen7(struct adreno_device *adreno_dev)
+{
+	return 1;
+}
+#else
 static inline int adreno_is_a5xx(struct adreno_device *adreno_dev)
 {
 	return ADRENO_GPUREV(adreno_dev) >= 500 &&
@@ -1323,6 +1386,7 @@ static inline int adreno_is_gen8(struct adreno_device *adreno_dev)
 	return ADRENO_GPUREV(adreno_dev) >= 0x080000 &&
 			ADRENO_GPUREV(adreno_dev) < 0x090000;
 }
+#endif /* CONFIG_QCOM_KGSL_GEN7_ONLY */
 
 ADRENO_TARGET(gen7_0_0, ADRENO_REV_GEN7_0_0)
 ADRENO_TARGET(gen7_0_1, ADRENO_REV_GEN7_0_1)
@@ -1336,11 +1400,13 @@ ADRENO_TARGET(gen7_9_1, ADRENO_REV_GEN7_9_1)
 ADRENO_TARGET(gen7_14_0, ADRENO_REV_GEN7_14_0)
 ADRENO_TARGET(gen7_11_0, ADRENO_REV_GEN7_11_0)
 ADRENO_TARGET(gen7_17_0, ADRENO_REV_GEN7_17_0)
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 ADRENO_TARGET(gen8_0_0, ADRENO_REV_GEN8_0_0)
 ADRENO_TARGET(gen8_0_1, ADRENO_REV_GEN8_0_1)
 ADRENO_TARGET(gen8_3_0, ADRENO_REV_GEN8_3_0)
 ADRENO_TARGET(gen8_4_0, ADRENO_REV_GEN8_4_0)
 ADRENO_TARGET(gen8_6_0, ADRENO_REV_GEN8_6_0)
+#endif
 
 static inline int adreno_is_gen7_9_x(struct adreno_device *adreno_dev)
 {
@@ -1365,11 +1431,13 @@ static inline int adreno_is_gen7_2_x_family(struct adreno_device *adreno_dev)
 		adreno_is_gen7_14_0_family(adreno_dev) || adreno_is_gen7_11_0(adreno_dev);
 }
 
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 static inline int adreno_is_gen8_0_x_family(struct adreno_device *adreno_dev)
 {
 	return adreno_is_gen8_0_0(adreno_dev) || adreno_is_gen8_0_1(adreno_dev) ||
 		adreno_is_gen8_4_0(adreno_dev) || adreno_is_gen8_6_0(adreno_dev);
 }
+#endif
 
 /* Gen7 targets which does not support concurrent binning */
 static inline int adreno_is_gen7_no_cb_family(struct adreno_device *adreno_dev)

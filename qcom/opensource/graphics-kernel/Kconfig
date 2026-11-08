@@ -108,3 +108,15 @@ config QCOM_KGSL_SYNX
 	  synx API for HW fence feature. This allows hardware fence inter-op
 	  between HW fence clients and SYNX clients. If not enabled, then
 	  kgsl will use msm_hw_fence APIs for hardware fence feature.
+
+config QCOM_KGSL_GEN7_ONLY
+	bool "Build only the Adreno Gen 7 GPU support"
+	help
+	  Say 'Y' on targets whose GPUs are all Adreno Gen 7, such as waipio
+	  and cape (gen7_0_0, gen7_0_1 and gen7_4_0). The a5xx, a6xx and
+	  Gen 8 code is left out of the module and the adreno_is_*() family
+	  checks become compile-time constants, so only the Gen 7 paths
+	  remain.
+
+config QCOM_KGSL_NON_GEN7_CORESIGHT
+	def_bool QCOM_KGSL_CORESIGHT && !QCOM_KGSL_GEN7_ONLY

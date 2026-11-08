@@ -16,10 +16,14 @@
 #include "kgsl_trace.h"
 
 static const struct of_device_id gmu_match_table[] = {
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 	{ .compatible = "qcom,gpu-gmu", .data = &a6xx_gmu_driver },
 	{ .compatible = "qcom,gpu-rgmu", .data = &a6xx_rgmu_driver },
+#endif
 	{ .compatible = "qcom,gen7-gmu", .data = &gen7_gmu_driver },
+#ifndef CONFIG_QCOM_KGSL_GEN7_ONLY
 	{ .compatible = "qcom,gen8-gmu", .data = &gen8_gmu_driver },
+#endif
 	{},
 };
 
