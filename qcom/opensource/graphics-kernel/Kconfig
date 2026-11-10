@@ -43,7 +43,7 @@ config QCOM_KGSL_IOCOHERENCY_DEFAULT
 	 the user can still selectively enable I/O coherency with a flag.
 
 config QCOM_KGSL_IDLE_TIMEOUT
-	int
+	int "GPU idle timeout in milliseconds"
 	default 80
 	help
 	  GPU idle timeout for Adreno GPU. This value decides after how
