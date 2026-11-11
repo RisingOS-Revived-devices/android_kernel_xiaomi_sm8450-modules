@@ -8,7 +8,7 @@
 
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/pm_wakeup.h>
+#include <linux/device.h> /* pm_wakeup.h is only included through device.h */
 #include <video/mipi_display.h>
 
 #include "dsi_panel.h"

@@ -9,7 +9,7 @@
 
 #include <linux/atomic.h>
 #include <linux/mutex.h>
-#include <linux/pm_wakeup.h>
+#include <linux/device.h> /* pm_wakeup.h is only included through device.h */
 #include <linux/types.h>
 #include <drm/mi_disp.h>
 
