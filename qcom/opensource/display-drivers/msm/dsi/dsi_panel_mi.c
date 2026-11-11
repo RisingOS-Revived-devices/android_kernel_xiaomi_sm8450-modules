@@ -357,8 +357,8 @@ bool dsi_panel_mi_set_backlight(struct dsi_panel *panel, u32 *bl_lvl)
 
 	mi->last_bl_lvl = *bl_lvl;
 
-	/* Applied when local HBM or FOD HBM is turned off */
-	if (mi->lhbm_nits || mi->fod_hbm)
+	/* Applied when local HBM or FOD HBM is off; FOD calibration levels pass, as on 5.10 */
+	if (mi->lhbm_nits || (mi->fod_hbm && !panel->mi_cfg.in_fod_calibration))
 		return true;
 
 	if (mi_dsi_panel_skip_backlight(panel, *bl_lvl))

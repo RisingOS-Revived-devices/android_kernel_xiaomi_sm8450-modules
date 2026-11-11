@@ -406,7 +406,6 @@ int mi_dsi_panel_set_disp_param(struct dsi_panel *panel,
 				ctl->feature_val;
 		break;
 	case DISP_FEATURE_FOD_CALIBRATION_HBM:
-		mi_cfg->in_fod_calibration = ctl->feature_val != -1;
 		rc = dsi_panel_mi_set_fod_hbm(panel, ctl->feature_val != -1);
 		mi_cfg->feature_val[DISP_FEATURE_FOD_CALIBRATION_HBM] =
 				ctl->feature_val;
