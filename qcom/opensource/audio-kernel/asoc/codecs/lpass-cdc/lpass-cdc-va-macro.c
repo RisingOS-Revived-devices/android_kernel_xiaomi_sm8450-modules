@@ -1177,12 +1177,13 @@ static int lpass_cdc_va_macro_tx_mixer_put(struct snd_kcontrol *kcontrol,
 					 &va_priv, __func__))
 		return -EINVAL;
 
+	/* Count a decoder only when its bit changes; a repeated write must not move the count. */
 	if (enable) {
-		set_bit(dec_id, &va_priv->active_ch_mask[dai_id]);
-		va_priv->active_ch_cnt[dai_id]++;
+		if (!test_and_set_bit(dec_id, &va_priv->active_ch_mask[dai_id]))
+			va_priv->active_ch_cnt[dai_id]++;
 	} else {
-		clear_bit(dec_id, &va_priv->active_ch_mask[dai_id]);
-		va_priv->active_ch_cnt[dai_id]--;
+		if (test_and_clear_bit(dec_id, &va_priv->active_ch_mask[dai_id]))
+			va_priv->active_ch_cnt[dai_id]--;
 	}
 
 	snd_soc_dapm_mixer_update_power(widget->dapm, kcontrol, enable, update);
